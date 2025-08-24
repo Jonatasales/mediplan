@@ -89,16 +89,11 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-      {/* Header com gradiente e efeito de sombra suave */}
+      {/* Header simplificado */}
       <header className="bg-gradient-to-r from-emerald-600 to-teal-500 shadow-md">
-        <div className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8 flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold text-white">MedPlan</h1>
-            <p className="text-emerald-100 text-sm">Olá, {user?.user_metadata?.nome || 'Médico'}</p>
-          </div>
-          <Button onClick={handleLogout} variant="outline" className="bg-white hover:bg-gray-100 text-emerald-600">
-            Sair
-          </Button>
+        <div className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
+          <h1 className="text-3xl font-bold text-white">Dashboard</h1>
+          <p className="text-emerald-100 text-sm">Olá, {user?.user_metadata?.nome || 'Médico'}</p>
         </div>
       </header>
 
@@ -347,15 +342,6 @@ export default function DashboardPage() {
           </div>
         </div>
       </main>
-      
-      {/* Footer simples */}
-      <footer className="bg-white border-t mt-12 py-6">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <p className="text-center text-sm text-gray-500">
-            &copy; {new Date().getFullYear()} MedPlan - Controle de Plantões Médicos
-          </p>
-        </div>
-      </footer>
     </div>
   );
 }
