@@ -16,6 +16,12 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  // Configuração específica para o Netlify
+  trailingSlash: true,
+  // Configuração para rotas de API
+  experimental: {
+    serverActions: false,
+  },
 };
 
 module.exports = nextConfig;

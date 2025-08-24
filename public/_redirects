@@ -1,0 +1,2 @@
+# Redireciona todas as rotas para o index.html para permitir que o roteamento do lado do cliente funcione
+/*    /index.html   200

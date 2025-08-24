@@ -1,6 +1,10 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 
+// Configuração para exportação estática
+export const dynamic = 'force-static';
+export const revalidate = false;
+
 // ATENÇÃO: Esta rota é apenas para ambiente de desenvolvimento!
 // Em produção, este endpoint não deve existir.
 
