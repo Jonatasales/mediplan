@@ -2,6 +2,8 @@
 
 MedPlan é uma aplicação web responsiva para médicos gerenciarem seus plantões, acompanharem previsões de pagamento por hospital e monitorarem recebimentos, com visão em calendário e dashboards mensais/histórico.
 
+[![Netlify Status](https://api.netlify.com/api/v1/badges/YOUR-NETLIFY-BADGE-ID/deploy-status)](https://app.netlify.com/sites/medplan/deploys)
+
 ## Funcionalidades
 
 ### MVP (V1)
@@ -20,6 +22,7 @@ MedPlan é uma aplicação web responsiva para médicos gerenciarem seus plantõ
 - **UI Components**: Shadcn UI
 - **Formulários**: React Hook Form, Zod
 - **Datas**: date-fns
+- **Deploy**: Netlify
 
 ## Estrutura do Projeto
 
@@ -84,8 +87,8 @@ medplan/
 
 1. Clone o repositório:
 ```bash
-git clone https://github.com/seu-usuario/medplan.git
-cd medplan
+git clone https://github.com/Jonatasales/mediplan.git
+cd mediplan
 ```
 
 2. Instale as dependências:
@@ -94,9 +97,10 @@ npm install
 ```
 
 3. Configure as variáveis de ambiente:
+Crie um arquivo `.env.local` na raiz do projeto com o seguinte conteúdo:
 ```
-NEXT_PUBLIC_SUPABASE_URL=sua-url-do-supabase
-NEXT_PUBLIC_SUPABASE_ANON_KEY=sua-chave-anonima-do-supabase
+NEXT_PUBLIC_SUPABASE_URL=https://eqbiczyksmfgskxqwskl.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxYmljenlrc21mZ3NreHF3c2tsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYwNjI1NzQsImV4cCI6MjA3MTYzODU3NH0.hpUwdj2BvnDYyJOCL3PpQ1AlbY-8WUzJwvzCCAQOvNI
 ```
 
 4. Execute o projeto em modo de desenvolvimento:
@@ -105,6 +109,20 @@ npm run dev
 ```
 
 5. Acesse a aplicação em `http://localhost:3000`
+
+## Deploy
+
+### Deploy no Netlify
+
+1. Faça fork deste repositório
+2. Conecte o repositório ao Netlify
+3. Configure as variáveis de ambiente no Netlify:
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+4. Configure as opções de build:
+   - Build command: `npm run build`
+   - Publish directory: `.next`
+5. Clique em "Deploy site"
 
 ## Próximos Passos (V1.1 e V2)
 
