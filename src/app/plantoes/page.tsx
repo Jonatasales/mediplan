@@ -1,116 +1,75 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { AppLayout } from '@/components/layout/AppLayout';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Plus, Pencil, Trash2, Check, Clock, DollarSign } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/lib/supabase';
-import { Database } from '@/lib/supabase';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Toaster } from '@/components/ui/sonner';
 import { toast } from 'sonner';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { PlantaoForm } from '@/components/plantoes/PlantaoForm';
-import { format } from 'date-fns';
+import { authClient } from '@/lib/auth-bypass';
+import { Loader2, Plus, ArrowLeft } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Badge } from '@/components/ui/badge';
-import { RecebimentoForm } from '@/components/plantoes/RecebimentoForm';
-
-type Plantao = Database['public']['Tables']['plantoes']['Row'] & {
-  hospitais: Database['public']['Tables']['hospitais']['Row'];
-};
 
 export default function PlantoesPage() {
-  const { user } = useAuth();
-  const [plantoes, setPlantoes] = useState<Plantao[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isPlantaoDialogOpen, setIsPlantaoDialogOpen] = useState(false);
-  const [isRecebimentoDialogOpen, setIsRecebimentoDialogOpen] = useState(false);
-  const [currentPlantao, setCurrentPlantao] = useState<Plantao | null>(null);
-  const [filtroStatus, setFiltroStatus] = useState<string | null>(null);
+  const [plantoes, setPlantoes] = useState<any[]>([]);
+  const [hospitais, setHospitais] = useState<Record<string, any>>({});
+  const [user, setUser] = useState<any>(null);
+  const router = useRouter();
 
   useEffect(() => {
-    if (user) {
-      fetchPlantoes();
-    }
-  }, [user, filtroStatus]);
-
-  const fetchPlantoes = async () => {
-    try {
-      setLoading(true);
-      let query = supabase
-        .from('plantoes')
-        .select('*, hospitais(*)')
-        .eq('user_id', user?.id)
-        .order('data', { ascending: false });
-      
-      if (filtroStatus) {
-        query = query.eq('status', filtroStatus);
+    const checkUser = async () => {
+      try {
+        const { data: { user } } = await authClient.auth.getUser();
+        
+        if (!user) {
+          router.push('/auth/login');
+          return;
+        }
+        
+        setUser(user);
+        
+        // Carregar hospitais do usuário
+        const { data: hospitaisData, error: hospitaisError } = await authClient.from('hospitais')
+          .select('*')
+          .eq('profissional_id', user.id);
+        
+        if (hospitaisError) {
+          console.error('Erro ao carregar hospitais:', hospitaisError);
+        } else {
+          const hospitaisMap: Record<string, any> = {};
+          hospitaisData?.forEach(hospital => {
+            hospitaisMap[hospital.id] = hospital;
+          });
+          setHospitais(hospitaisMap);
+        }
+        
+        // Carregar plantões do usuário
+        const { data: plantoesData, error: plantoesError } = await authClient.from('plantoes')
+          .select('*')
+          .eq('profissional_id', user.id)
+          .order('data', { ascending: false });
+        
+        if (plantoesError) {
+          console.error('Erro ao carregar plantões:', plantoesError);
+          toast.error('Erro ao carregar plantões');
+        } else {
+          setPlantoes(plantoesData || []);
+        }
+      } catch (error) {
+        console.error('Erro ao verificar usuário:', error);
+        router.push('/auth/login');
+      } finally {
+        setLoading(false);
       }
-      
-      const { data, error } = await query.limit(50);
-
-      if (error) throw error;
-      
-      setPlantoes(data as Plantao[] || []);
-    } catch (error: any) {
-      toast.error('Erro ao buscar plantões', {
-        description: error.message,
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleOpenPlantaoDialog = (plantao: Plantao | null = null) => {
-    setCurrentPlantao(plantao);
-    setIsPlantaoDialogOpen(true);
-  };
-
-  const handleClosePlantaoDialog = () => {
-    setIsPlantaoDialogOpen(false);
-    setCurrentPlantao(null);
-  };
-
-  const handleOpenRecebimentoDialog = (plantao: Plantao) => {
-    setCurrentPlantao(plantao);
-    setIsRecebimentoDialogOpen(true);
-  };
-
-  const handleCloseRecebimentoDialog = () => {
-    setIsRecebimentoDialogOpen(false);
-    setCurrentPlantao(null);
-  };
-
-  const handleDeletePlantao = async (id: string) => {
-    if (!confirm('Tem certeza que deseja excluir este plantão?')) return;
+    };
     
-    try {
-      const { error } = await supabase
-        .from('plantoes')
-        .delete()
-        .eq('id', id);
+    checkUser();
+  }, [router]);
 
-      if (error) throw error;
-      
-      toast.success('Plantão excluído com sucesso');
-      fetchPlantoes();
-    } catch (error: any) {
-      toast.error('Erro ao excluir plantão', {
-        description: error.message,
-      });
-    }
-  };
-
-  const handleSavePlantao = async () => {
-    fetchPlantoes();
-    handleClosePlantaoDialog();
-  };
-
-  const handleSaveRecebimento = async () => {
-    fetchPlantoes();
-    handleCloseRecebimentoDialog();
-  };
-
+  // Função para formatar valores monetários
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -118,205 +77,126 @@ export default function PlantoesPage() {
     }).format(value);
   };
 
+  // Função para formatar data
   const formatDate = (dateString: string) => {
-    return format(new Date(dateString), 'dd/MM/yyyy', { locale: ptBR });
-  };
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'LANCADO':
-        return <Badge variant="outline" className="bg-gray-100">Lançado</Badge>;
-      case 'PREVISTO':
-        return <Badge variant="outline" className="bg-blue-100 text-blue-800">Previsto</Badge>;
-      case 'RECEBIDO':
-        return <Badge variant="outline" className="bg-green-100 text-green-800">Recebido</Badge>;
-      case 'CONCILIADO':
-        return <Badge variant="outline" className="bg-purple-100 text-purple-800">Conciliado</Badge>;
-      default:
-        return <Badge variant="outline">{status}</Badge>;
+    try {
+      return format(parseISO(dateString), 'dd/MM/yyyy', { locale: ptBR });
+    } catch (error) {
+      return dateString;
     }
   };
 
-  return (
-    <AppLayout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold">Plantões</h1>
-          <Button onClick={() => handleOpenPlantaoDialog()} className="flex items-center gap-2">
-            <Plus className="h-4 w-4" /> Novo Plantão
-          </Button>
-        </div>
+  // Função para obter o nome do hospital pelo ID
+  const getHospitalName = (hospitalId: string) => {
+    return hospitais[hospitalId]?.nome || 'Hospital não encontrado';
+  };
 
-        <div className="bg-white p-4 rounded-lg shadow">
-          <div className="flex flex-wrap gap-2 mb-4">
-            <Button 
-              variant={filtroStatus === null ? "default" : "outline"} 
-              onClick={() => setFiltroStatus(null)}
-            >
-              Todos
-            </Button>
-            <Button 
-              variant={filtroStatus === 'LANCADO' ? "default" : "outline"} 
-              onClick={() => setFiltroStatus('LANCADO')}
-            >
-              Lançados
-            </Button>
-            <Button 
-              variant={filtroStatus === 'PREVISTO' ? "default" : "outline"} 
-              onClick={() => setFiltroStatus('PREVISTO')}
-            >
-              Previstos
-            </Button>
-            <Button 
-              variant={filtroStatus === 'RECEBIDO' ? "default" : "outline"} 
-              onClick={() => setFiltroStatus('RECEBIDO')}
-            >
-              Recebidos
-            </Button>
-            <Button 
-              variant={filtroStatus === 'CONCILIADO' ? "default" : "outline"} 
-              onClick={() => setFiltroStatus('CONCILIADO')}
-            >
-              Conciliados
-            </Button>
-          </div>
+  // Função para obter a cor do status
+  const getStatusColor = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'recebido':
+        return 'bg-green-100 text-green-800';
+      case 'previsto':
+        return 'bg-blue-100 text-blue-800';
+      case 'lançado':
+        return 'bg-gray-100 text-gray-800';
+      case 'atrasado':
+        return 'bg-red-100 text-red-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
 
-          {loading ? (
-            <div className="flex justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-emerald-600"></div>
-            </div>
-          ) : plantoes.length === 0 ? (
-            <div className="text-center py-12">
-              <h3 className="text-lg font-medium text-gray-900">Nenhum plantão encontrado</h3>
-              <p className="mt-1 text-gray-500">
-                {filtroStatus 
-                  ? 'Tente outro filtro ou adicione um novo plantão.' 
-                  : 'Comece adicionando seu primeiro plantão.'}
-              </p>
-              <div className="mt-6">
-                <Button onClick={() => handleOpenPlantaoDialog()}>
-                  <Plus className="h-4 w-4 mr-2" /> Adicionar Plantão
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Data
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Hospital
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Horário
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Valor
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Previsão
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Ações
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {plantoes.map((plantao) => (
-                    <tr key={plantao.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {formatDate(plantao.data)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {plantao.hospitais.nome}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {plantao.inicio && plantao.fim 
-                          ? `${plantao.inicio.substring(0, 5)} - ${plantao.fim.substring(0, 5)}`
-                          : plantao.turno || '-'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {formatCurrency(plantao.valor_bruto)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        {getStatusBadge(plantao.status)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {plantao.previsao_pagamento ? formatDate(plantao.previsao_pagamento) : '-'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        {(plantao.status === 'LANCADO' || plantao.status === 'PREVISTO') && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleOpenRecebimentoDialog(plantao)}
-                            className="text-green-600 hover:text-green-900 mr-2"
-                            title="Marcar como recebido"
-                          >
-                            <DollarSign className="h-4 w-4" />
-                          </Button>
-                        )}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleOpenPlantaoDialog(plantao)}
-                          className="text-blue-600 hover:text-blue-900 mr-2"
-                          title="Editar"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeletePlantao(plantao.id)}
-                          className="text-red-600 hover:text-red-900"
-                          title="Excluir"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
       </div>
+    );
+  }
 
-      <Dialog open={isPlantaoDialogOpen} onOpenChange={setIsPlantaoDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>{currentPlantao ? 'Editar Plantão' : 'Novo Plantão'}</DialogTitle>
-          </DialogHeader>
-          <PlantaoForm 
-            plantao={currentPlantao} 
-            onSave={handleSavePlantao} 
-            onCancel={handleClosePlantaoDialog} 
-          />
-        </DialogContent>
-      </Dialog>
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-8 px-4">
+      <div className="max-w-6xl mx-auto">
+        <div className="flex justify-between items-center mb-6">
+          <Link href="/dashboard" className="flex items-center text-emerald-600 hover:text-emerald-700">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            <span>Voltar para o Dashboard</span>
+          </Link>
+          <Link href="/plantoes/novo">
+            <Button className="bg-emerald-600 hover:bg-emerald-700">
+              <Plus className="h-4 w-4 mr-2" />
+              Novo Plantão
+            </Button>
+          </Link>
+        </div>
 
-      <Dialog open={isRecebimentoDialogOpen} onOpenChange={setIsRecebimentoDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Registrar Recebimento</DialogTitle>
-          </DialogHeader>
-          {currentPlantao && (
-            <RecebimentoForm 
-              plantao={currentPlantao} 
-              onSave={handleSaveRecebimento} 
-              onCancel={handleCloseRecebimentoDialog} 
-            />
-          )}
-        </DialogContent>
-      </Dialog>
-    </AppLayout>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-2xl">Meus Plantões</CardTitle>
+            <CardDescription>Visualize e gerencie todos os seus plantões</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {plantoes.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="bg-gray-50">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hospital</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Horário</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Valor</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {plantoes.map((plantao) => (
+                      <tr key={plantao.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          {formatDate(plantao.data)}
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {getHospitalName(plantao.hospital_id)}
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {plantao.hora_inicio} - {plantao.hora_fim}
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {formatCurrency(plantao.valor)}
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(plantao.status)}`}>
+                            {plantao.status.charAt(0).toUpperCase() + plantao.status.slice(1)}
+                          </span>
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          <Link href={`/plantoes/${plantao.id}`}>
+                            <Button variant="ghost" size="sm">
+                              Detalhes
+                            </Button>
+                          </Link>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <p className="text-gray-500 mb-4">Você ainda não possui plantões cadastrados.</p>
+                <Link href="/plantoes/novo">
+                  <Button className="bg-emerald-600 hover:bg-emerald-700">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Cadastrar Primeiro Plantão
+                  </Button>
+                </Link>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+      <Toaster position="top-right" />
+    </div>
   );
 }

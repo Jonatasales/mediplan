@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { authClient } from '@/lib/auth-bypass';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
@@ -210,9 +211,11 @@ export default function DashboardPage() {
                   </table>
                 </div>
                 <div className="mt-4 flex justify-center">
-                  <Button onClick={() => router.push('/plantoes')} className="bg-emerald-500 hover:bg-emerald-600 text-white">
-                    Ver todos os plantões
-                  </Button>
+                  <Link href="/plantoes">
+                    <Button className="bg-emerald-500 hover:bg-emerald-600 text-white">
+                      Ver todos os plantões
+                    </Button>
+                  </Link>
                 </div>
               </div>
             </div>
@@ -277,30 +280,38 @@ export default function DashboardPage() {
             <div className="bg-white rounded-xl shadow-md p-6">
               <h3 className="text-lg font-medium text-gray-900 mb-4">Ações Rápidas</h3>
               <div className="grid grid-cols-2 gap-4">
-                <Button onClick={() => router.push('/plantoes/novo')} className="bg-emerald-500 hover:bg-emerald-600 text-white flex items-center justify-center py-6">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                  </svg>
-                  Novo Plantão
-                </Button>
-                <Button onClick={() => router.push('/hospitais/novo')} className="bg-blue-500 hover:bg-blue-600 text-white flex items-center justify-center py-6">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                  </svg>
-                  Novo Hospital
-                </Button>
-                <Button onClick={() => router.push('/calendario')} className="bg-purple-500 hover:bg-purple-600 text-white flex items-center justify-center py-6">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                  Calendário
-                </Button>
-                <Button onClick={() => router.push('/historico')} className="bg-amber-500 hover:bg-amber-600 text-white flex items-center justify-center py-6">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  Relatórios
-                </Button>
+                <Link href="/plantoes/novo" className="w-full">
+                  <Button className="bg-emerald-500 hover:bg-emerald-600 text-white flex items-center justify-center py-6 w-full">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                    </svg>
+                    Novo Plantão
+                  </Button>
+                </Link>
+                <Link href="/hospitais/novo" className="w-full">
+                  <Button className="bg-blue-500 hover:bg-blue-600 text-white flex items-center justify-center py-6 w-full">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                    </svg>
+                    Novo Hospital
+                  </Button>
+                </Link>
+                <Link href="/calendario" className="w-full">
+                  <Button className="bg-purple-500 hover:bg-purple-600 text-white flex items-center justify-center py-6 w-full">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    Calendário
+                  </Button>
+                </Link>
+                <Link href="/historico" className="w-full">
+                  <Button className="bg-amber-500 hover:bg-amber-600 text-white flex items-center justify-center py-6 w-full">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Relatórios
+                  </Button>
+                </Link>
               </div>
             </div>
             
@@ -308,9 +319,11 @@ export default function DashboardPage() {
             <div className="bg-white rounded-xl shadow-md p-6">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-medium text-gray-900">Seu Perfil</h3>
-                <Button variant="outline" size="sm" onClick={() => router.push('/perfil')}>
-                  Editar
-                </Button>
+                <Link href="/perfil">
+                  <Button variant="outline" size="sm">
+                    Editar
+                  </Button>
+                </Link>
               </div>
               <div className="space-y-2">
                 <div className="flex">

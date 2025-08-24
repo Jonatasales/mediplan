@@ -1,177 +1,128 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { AppLayout } from '@/components/layout/AppLayout';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Download, Filter } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/lib/supabase';
-import { Database } from '@/lib/supabase';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Toaster } from '@/components/ui/sonner';
 import { toast } from 'sonner';
-import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns';
+import { authClient } from '@/lib/auth-bypass';
+import { Loader2, ArrowLeft, Download } from 'lucide-react';
+import { format, parseISO, startOfMonth, endOfMonth, getMonth, getYear } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Badge } from '@/components/ui/badge';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
-import { cn } from '@/lib/utils';
-import { CalendarIcon } from 'lucide-react';
-
-type Plantao = Database['public']['Tables']['plantoes']['Row'] & {
-  hospitais: Database['public']['Tables']['hospitais']['Row'];
-  recebimentos?: Database['public']['Tables']['recebimentos']['Row'][];
-};
-
-type Hospital = Database['public']['Tables']['hospitais']['Row'];
-
-type FiltroState = {
-  dataInicio: Date;
-  dataFim: Date;
-  hospitalId: string | null;
-  status: string | null;
-};
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export default function HistoricoPage() {
-  const { user } = useAuth();
-  const [plantoes, setPlantoes] = useState<Plantao[]>([]);
-  const [hospitais, setHospitais] = useState<Hospital[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isFiltroDialogOpen, setIsFiltroDialogOpen] = useState(false);
-  
-  // Estado para filtros
-  const [filtro, setFiltro] = useState<FiltroState>({
-    dataInicio: startOfMonth(subMonths(new Date(), 3)),
-    dataFim: endOfMonth(new Date()),
-    hospitalId: null,
-    status: null,
-  });
+  const [plantoes, setPlantoes] = useState<any[]>([]);
+  const [hospitais, setHospitais] = useState<Record<string, any>>({});
+  const [user, setUser] = useState<any>(null);
+  const [mesSelecionado, setMesSelecionado] = useState(getMonth(new Date()));
+  const [anoSelecionado, setAnoSelecionado] = useState(getYear(new Date()));
+  const router = useRouter();
+
+  // Dados para os selects
+  const meses = [
+    { value: 0, label: 'Janeiro' },
+    { value: 1, label: 'Fevereiro' },
+    { value: 2, label: 'Março' },
+    { value: 3, label: 'Abril' },
+    { value: 4, label: 'Maio' },
+    { value: 5, label: 'Junho' },
+    { value: 6, label: 'Julho' },
+    { value: 7, label: 'Agosto' },
+    { value: 8, label: 'Setembro' },
+    { value: 9, label: 'Outubro' },
+    { value: 10, label: 'Novembro' },
+    { value: 11, label: 'Dezembro' },
+  ];
+
+  const anos = Array.from({ length: 5 }, (_, i) => getYear(new Date()) - 2 + i);
 
   useEffect(() => {
-    if (user) {
-      fetchHospitais();
-      fetchPlantoes();
-    }
-  }, [user]);
+    const checkUser = async () => {
+      try {
+        const { data: { user } } = await authClient.auth.getUser();
+        
+        if (!user) {
+          router.push('/auth/login');
+          return;
+        }
+        
+        setUser(user);
+        
+        // Carregar hospitais do usuário
+        const { data: hospitaisData, error: hospitaisError } = await authClient.from('hospitais')
+          .select('*')
+          .eq('profissional_id', user.id);
+        
+        if (hospitaisError) {
+          console.error('Erro ao carregar hospitais:', hospitaisError);
+        } else {
+          const hospitaisMap: Record<string, any> = {};
+          hospitaisData?.forEach(hospital => {
+            hospitaisMap[hospital.id] = hospital;
+          });
+          setHospitais(hospitaisMap);
+        }
+        
+        // Carregar plantões do usuário
+        await carregarPlantoes(user.id, mesSelecionado, anoSelecionado);
+      } catch (error) {
+        console.error('Erro ao verificar usuário:', error);
+        router.push('/auth/login');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    checkUser();
+  }, [router]);
 
-  const fetchHospitais = async () => {
+  // Função para carregar plantões com base no mês e ano selecionados
+  const carregarPlantoes = async (userId: string, mes: number, ano: number) => {
+    setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('hospitais')
+      const dataInicio = startOfMonth(new Date(ano, mes));
+      const dataFim = endOfMonth(new Date(ano, mes));
+      
+      const { data: plantoesData, error } = await authClient.from('plantoes')
         .select('*')
-        .eq('user_id', user?.id)
-        .order('nome');
-
-      if (error) throw error;
+        .eq('profissional_id', userId)
+        .gte('data', format(dataInicio, 'yyyy-MM-dd'))
+        .lte('data', format(dataFim, 'yyyy-MM-dd'))
+        .order('data', { ascending: true });
       
-      setHospitais(data || []);
-    } catch (error: any) {
-      toast.error('Erro ao buscar hospitais', {
-        description: error.message,
-      });
-    }
-  };
-
-  const fetchPlantoes = async () => {
-    try {
-      setLoading(true);
-      
-      let query = supabase
-        .from('plantoes')
-        .select('*, hospitais(*), recebimentos(*)')
-        .eq('user_id', user?.id)
-        .gte('data', format(filtro.dataInicio, 'yyyy-MM-dd'))
-        .lte('data', format(filtro.dataFim, 'yyyy-MM-dd'))
-        .order('data', { ascending: false });
-      
-      if (filtro.hospitalId) {
-        query = query.eq('hospital_id', filtro.hospitalId);
+      if (error) {
+        console.error('Erro ao carregar plantões:', error);
+        toast.error('Erro ao carregar plantões');
+      } else {
+        setPlantoes(plantoesData || []);
       }
-      
-      if (filtro.status) {
-        query = query.eq('status', filtro.status);
-      }
-      
-      const { data, error } = await query;
-
-      if (error) throw error;
-      
-      setPlantoes(data as Plantao[] || []);
-    } catch (error: any) {
-      toast.error('Erro ao buscar histórico de plantões', {
-        description: error.message,
-      });
+    } catch (error) {
+      console.error('Erro ao carregar plantões:', error);
+      toast.error('Erro ao carregar plantões');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleFiltroChange = (newFiltro: Partial<FiltroState>) => {
-    setFiltro(prev => ({ ...prev, ...newFiltro }));
+  // Função para lidar com a mudança de mês
+  const handleMesChange = (value: string) => {
+    const mes = parseInt(value);
+    setMesSelecionado(mes);
+    carregarPlantoes(user.id, mes, anoSelecionado);
   };
 
-  const handleAplicarFiltro = () => {
-    fetchPlantoes();
-    setIsFiltroDialogOpen(false);
+  // Função para lidar com a mudança de ano
+  const handleAnoChange = (value: string) => {
+    const ano = parseInt(value);
+    setAnoSelecionado(ano);
+    carregarPlantoes(user.id, mesSelecionado, ano);
   };
 
-  const handleExportarCSV = () => {
-    try {
-      // Preparar dados para CSV
-      const headers = [
-        'Data', 
-        'Hospital', 
-        'Horário', 
-        'Valor Bruto', 
-        'Status', 
-        'Previsão de Pagamento',
-        'Data Recebimento',
-        'Valor Recebido'
-      ];
-      
-      const rows = plantoes.map(plantao => {
-        const recebimento = plantao.recebimentos && plantao.recebimentos.length > 0 
-          ? plantao.recebimentos[0] 
-          : null;
-        
-        return [
-          format(new Date(plantao.data), 'dd/MM/yyyy'),
-          plantao.hospitais.nome,
-          plantao.inicio && plantao.fim 
-            ? `${plantao.inicio.substring(0, 5)} - ${plantao.fim.substring(0, 5)}`
-            : plantao.turno || '-',
-          plantao.valor_bruto.toString().replace('.', ','),
-          getStatusText(plantao.status),
-          plantao.previsao_pagamento ? format(new Date(plantao.previsao_pagamento), 'dd/MM/yyyy') : '-',
-          recebimento ? format(new Date(recebimento.recebido_em), 'dd/MM/yyyy') : '-',
-          recebimento ? recebimento.valor_recebido.toString().replace('.', ',') : '-'
-        ];
-      });
-      
-      // Converter para CSV
-      const csvContent = [
-        headers.join(';'),
-        ...rows.map(row => row.join(';'))
-      ].join('\n');
-      
-      // Criar blob e link para download
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.setAttribute('href', url);
-      link.setAttribute('download', `plantoes_${format(new Date(), 'yyyy-MM-dd')}.csv`);
-      link.style.visibility = 'hidden';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      toast.success('Arquivo CSV gerado com sucesso');
-    } catch (error: any) {
-      toast.error('Erro ao exportar CSV', {
-        description: error.message,
-      });
-    }
-  };
-
+  // Função para formatar valores monetários
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -179,296 +130,262 @@ export default function HistoricoPage() {
     }).format(value);
   };
 
+  // Função para formatar data
   const formatDate = (dateString: string) => {
-    return format(new Date(dateString), 'dd/MM/yyyy', { locale: ptBR });
-  };
-
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'LANCADO': return 'Lançado';
-      case 'PREVISTO': return 'Previsto';
-      case 'RECEBIDO': return 'Recebido';
-      case 'CONCILIADO': return 'Conciliado';
-      default: return status;
+    try {
+      return format(parseISO(dateString), 'dd/MM/yyyy', { locale: ptBR });
+    } catch (error) {
+      return dateString;
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'LANCADO':
-        return <Badge variant="outline" className="bg-gray-100">Lançado</Badge>;
-      case 'PREVISTO':
-        return <Badge variant="outline" className="bg-blue-100 text-blue-800">Previsto</Badge>;
-      case 'RECEBIDO':
-        return <Badge variant="outline" className="bg-green-100 text-green-800">Recebido</Badge>;
-      case 'CONCILIADO':
-        return <Badge variant="outline" className="bg-purple-100 text-purple-800">Conciliado</Badge>;
+  // Função para obter o nome do hospital pelo ID
+  const getHospitalName = (hospitalId: string) => {
+    return hospitais[hospitalId]?.nome || 'Hospital não encontrado';
+  };
+
+  // Função para calcular totais
+  const calcularTotais = () => {
+    const totalValor = plantoes.reduce((sum, plantao) => sum + (plantao.valor || 0), 0);
+    const totalRecebido = plantoes
+      .filter(plantao => plantao.status === 'recebido')
+      .reduce((sum, plantao) => sum + (plantao.valor || 0), 0);
+    const totalPrevisto = plantoes
+      .filter(plantao => plantao.status === 'previsto' || plantao.status === 'lançado')
+      .reduce((sum, plantao) => sum + (plantao.valor || 0), 0);
+    
+    return { totalValor, totalRecebido, totalPrevisto };
+  };
+
+  // Função para calcular totais por hospital
+  const calcularTotaisPorHospital = () => {
+    const totaisPorHospital: Record<string, { plantoes: number, valor: number }> = {};
+    
+    plantoes.forEach(plantao => {
+      const hospitalId = plantao.hospital_id;
+      if (!totaisPorHospital[hospitalId]) {
+        totaisPorHospital[hospitalId] = { plantoes: 0, valor: 0 };
+      }
+      totaisPorHospital[hospitalId].plantoes += 1;
+      totaisPorHospital[hospitalId].valor += plantao.valor || 0;
+    });
+    
+    return totaisPorHospital;
+  };
+
+  // Função para obter a cor do status
+  const getStatusColor = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'recebido':
+        return 'bg-green-100 text-green-800';
+      case 'previsto':
+        return 'bg-blue-100 text-blue-800';
+      case 'lançado':
+        return 'bg-gray-100 text-gray-800';
+      case 'atrasado':
+        return 'bg-red-100 text-red-800';
       default:
-        return <Badge variant="outline">{status}</Badge>;
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
-  // Calcular totais
-  const totalPlantoes = plantoes.length;
-  const totalValorBruto = plantoes.reduce((sum, plantao) => sum + plantao.valor_bruto, 0);
-  const totalRecebido = plantoes.reduce((sum, plantao) => {
-    if (plantao.recebimentos && plantao.recebimentos.length > 0) {
-      return sum + plantao.recebimentos[0].valor_recebido;
-    }
-    return sum;
-  }, 0);
+  const totais = calcularTotais();
+  const totaisPorHospital = calcularTotaisPorHospital();
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+      </div>
+    );
+  }
 
   return (
-    <AppLayout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold">Histórico de Plantões</h1>
-          <div className="flex space-x-2">
-            <Button 
-              variant="outline" 
-              onClick={() => setIsFiltroDialogOpen(true)}
-              className="flex items-center gap-2"
-            >
-              <Filter className="h-4 w-4" /> Filtrar
-            </Button>
-            <Button 
-              onClick={handleExportarCSV}
-              className="flex items-center gap-2"
-              disabled={plantoes.length === 0}
-            >
-              <Download className="h-4 w-4" /> Exportar CSV
-            </Button>
-          </div>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-8 px-4">
+      <div className="max-w-6xl mx-auto">
+        <div className="flex justify-between items-center mb-6">
+          <Link href="/dashboard" className="flex items-center text-emerald-600 hover:text-emerald-700">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            <span>Voltar para o Dashboard</span>
+          </Link>
+          <Button variant="outline" className="text-emerald-600 border-emerald-600">
+            <Download className="h-4 w-4 mr-2" />
+            Exportar Relatório
+          </Button>
         </div>
 
-        {/* Cards de resumo */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-white p-4 rounded-lg shadow">
-            <p className="text-sm text-gray-500">Total de Plantões</p>
-            <p className="text-2xl font-bold">{totalPlantoes}</p>
-          </div>
-          <div className="bg-white p-4 rounded-lg shadow">
-            <p className="text-sm text-gray-500">Valor Bruto Total</p>
-            <p className="text-2xl font-bold">{formatCurrency(totalValorBruto)}</p>
-          </div>
-          <div className="bg-white p-4 rounded-lg shadow">
-            <p className="text-sm text-gray-500">Total Recebido</p>
-            <p className="text-2xl font-bold">{formatCurrency(totalRecebido)}</p>
-          </div>
-        </div>
-
-        {/* Tabela de plantões */}
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          {loading ? (
-            <div className="flex justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-emerald-600"></div>
+        {/* Filtros */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Relatório de Plantões</CardTitle>
+            <CardDescription>Visualize seu histórico de plantões por período</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Mês</label>
+                <Select value={mesSelecionado.toString()} onValueChange={handleMesChange}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o mês" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {meses.map((mes) => (
+                      <SelectItem key={mes.value} value={mes.value.toString()}>
+                        {mes.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Ano</label>
+                <Select value={anoSelecionado.toString()} onValueChange={handleAnoChange}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o ano" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {anos.map((ano) => (
+                      <SelectItem key={ano} value={ano.toString()}>
+                        {ano}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-          ) : plantoes.length === 0 ? (
-            <div className="text-center py-12">
-              <h3 className="text-lg font-medium text-gray-900">Nenhum plantão encontrado</h3>
-              <p className="mt-1 text-gray-500">
-                Tente ajustar os filtros para ver mais resultados.
+          </CardContent>
+        </Card>
+
+        {/* Resumo */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg">Total de Plantões</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{plantoes.length}</div>
+              <p className="text-sm text-gray-500">
+                {meses.find(m => m.value === mesSelecionado)?.label} de {anoSelecionado}
               </p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Data
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Hospital
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Horário
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Valor Bruto
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Previsão
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Recebimento
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {plantoes.map((plantao) => {
-                    const recebimento = plantao.recebimentos && plantao.recebimentos.length > 0 
-                      ? plantao.recebimentos[0] 
-                      : null;
-                    
-                    return (
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg">Total Recebido</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-green-600">{formatCurrency(totais.totalRecebido)}</div>
+              <p className="text-sm text-gray-500">
+                {meses.find(m => m.value === mesSelecionado)?.label} de {anoSelecionado}
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg">Total Previsto</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-blue-600">{formatCurrency(totais.totalPrevisto)}</div>
+              <p className="text-sm text-gray-500">
+                {meses.find(m => m.value === mesSelecionado)?.label} de {anoSelecionado}
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Distribuição por Hospital */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Distribuição por Hospital</CardTitle>
+            <CardDescription>Plantões e valores por hospital no período</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {Object.keys(totaisPorHospital).length > 0 ? (
+              <div className="space-y-4">
+                {Object.entries(totaisPorHospital).map(([hospitalId, dados]) => (
+                  <div key={hospitalId}>
+                    <div className="flex justify-between text-sm mb-1">
+                      <span className="font-medium">{getHospitalName(hospitalId)}</span>
+                      <span className="text-gray-500">{dados.plantoes} plantões</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2.5">
+                      <div 
+                        className="bg-emerald-500 h-2.5 rounded-full" 
+                        style={{ width: `${(dados.valor / totais.totalValor) * 100}%` }}
+                      ></div>
+                    </div>
+                    <p className="text-xs text-gray-500 text-right mt-1">{formatCurrency(dados.valor)}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-center py-4 text-gray-500">Nenhum plantão registrado no período selecionado.</p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Lista de Plantões */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Lista de Plantões</CardTitle>
+            <CardDescription>
+              {plantoes.length > 0 
+                ? `${plantoes.length} plantão(ões) em ${meses.find(m => m.value === mesSelecionado)?.label} de ${anoSelecionado}` 
+                : 'Nenhum plantão registrado no período selecionado'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {plantoes.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="bg-gray-50">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hospital</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Horário</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Valor</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {plantoes.map((plantao) => (
                       <tr key={plantao.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                           {formatDate(plantao.data)}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {plantao.hospitais.nome}
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {getHospitalName(plantao.hospital_id)}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {plantao.inicio && plantao.fim 
-                            ? `${plantao.inicio.substring(0, 5)} - ${plantao.fim.substring(0, 5)}`
-                            : plantao.turno || '-'}
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {plantao.hora_inicio} - {plantao.hora_fim}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {formatCurrency(plantao.valor_bruto)}
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {formatCurrency(plantao.valor)}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm">
-                          {getStatusBadge(plantao.status)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {plantao.previsao_pagamento ? formatDate(plantao.previsao_pagamento) : '-'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {recebimento ? (
-                            <div>
-                              <div>{formatDate(recebimento.recebido_em)}</div>
-                              <div className="text-green-600">{formatCurrency(recebimento.valor_recebido)}</div>
-                            </div>
-                          ) : '-'}
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(plantao.status)}`}>
+                            {plantao.status.charAt(0).toUpperCase() + plantao.status.slice(1)}
+                          </span>
                         </td>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <p className="text-gray-500 mb-4">Nenhum plantão registrado no período selecionado.</p>
+                <Link href="/plantoes/novo">
+                  <Button className="bg-emerald-600 hover:bg-emerald-700">
+                    Cadastrar Plantão
+                  </Button>
+                </Link>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
-
-      {/* Dialog de filtro */}
-      <Dialog open={isFiltroDialogOpen} onOpenChange={setIsFiltroDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Filtrar Histórico</DialogTitle>
-          </DialogHeader>
-          
-          <div className="space-y-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Data Início</label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant={"outline"}
-                      className={cn(
-                        "w-full justify-start text-left font-normal",
-                        !filtro.dataInicio && "text-muted-foreground"
-                      )}
-                    >
-                      {filtro.dataInicio ? (
-                        format(filtro.dataInicio, "dd/MM/yyyy")
-                      ) : (
-                        <span>Selecione uma data</span>
-                      )}
-                      <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={filtro.dataInicio}
-                      onSelect={(date) => date && handleFiltroChange({ dataInicio: date })}
-                      disabled={(date) =>
-                        date > new Date() || date < new Date("1900-01-01")
-                      }
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-              
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Data Fim</label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant={"outline"}
-                      className={cn(
-                        "w-full justify-start text-left font-normal",
-                        !filtro.dataFim && "text-muted-foreground"
-                      )}
-                    >
-                      {filtro.dataFim ? (
-                        format(filtro.dataFim, "dd/MM/yyyy")
-                      ) : (
-                        <span>Selecione uma data</span>
-                      )}
-                      <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={filtro.dataFim}
-                      onSelect={(date) => date && handleFiltroChange({ dataFim: date })}
-                      disabled={(date) =>
-                        date > new Date() || date < new Date("1900-01-01")
-                      }
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Hospital</label>
-              <select
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                value={filtro.hospitalId || ''}
-                onChange={(e) => handleFiltroChange({ hospitalId: e.target.value || null })}
-              >
-                <option value="">Todos os hospitais</option>
-                {hospitais.map((hospital) => (
-                  <option key={hospital.id} value={hospital.id}>
-                    {hospital.nome}
-                  </option>
-                ))}
-              </select>
-            </div>
-            
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Status</label>
-              <select
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                value={filtro.status || ''}
-                onChange={(e) => handleFiltroChange({ status: e.target.value || null })}
-              >
-                <option value="">Todos os status</option>
-                <option value="LANCADO">Lançado</option>
-                <option value="PREVISTO">Previsto</option>
-                <option value="RECEBIDO">Recebido</option>
-                <option value="CONCILIADO">Conciliado</option>
-              </select>
-            </div>
-            
-            <div className="flex justify-end space-x-2 pt-4">
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={() => setIsFiltroDialogOpen(false)}
-              >
-                Cancelar
-              </Button>
-              <Button 
-                type="button" 
-                onClick={handleAplicarFiltro}
-              >
-                Aplicar Filtro
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </AppLayout>
+      <Toaster position="top-right" />
+    </div>
   );
 }
