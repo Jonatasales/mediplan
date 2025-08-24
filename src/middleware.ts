@@ -1,60 +1,60 @@
-import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-// Usar as mesmas variáveis definidas no arquivo supabase.ts
-const supabaseUrl = 'https://eqbiczyksmfgskxqwskl.supabase.co';
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxYmljenlrc21mZ3NreHF3c2tsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYwNjI1NzQsImV4cCI6MjA3MTYzODU3NH0.hpUwdj2BvnDYyJOCL3PpQ1AlbY-8WUzJwvzCCAQOvNI';
-
-export async function middleware(request: NextRequest) {
-  const res = NextResponse.next();
+export function middleware(request: NextRequest) {
+  // Redirecionar /dashboard para /(app)/dashboard
+  if (request.nextUrl.pathname === '/dashboard') {
+    return NextResponse.rewrite(new URL('/(app)/dashboard', request.url));
+  }
   
-  // Criar cliente Supabase diretamente
-  const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-    auth: {
-      persistSession: false,
-    }
-  });
+  // Redirecionar /calendario para /(app)/calendario
+  if (request.nextUrl.pathname === '/calendario') {
+    return NextResponse.rewrite(new URL('/(app)/calendario', request.url));
+  }
   
-  // Obter token de autenticação do cookie
-  const authCookie = request.cookies.get('sb-auth-token')?.value;
+  // Redirecionar /historico para /(app)/historico
+  if (request.nextUrl.pathname === '/historico') {
+    return NextResponse.rewrite(new URL('/(app)/historico', request.url));
+  }
   
-  let session = null;
-  if (authCookie) {
-    try {
-      const { data, error } = await supabase.auth.getUser(authCookie);
-      if (!error && data.user) {
-        session = { user: data.user };
-      }
-    } catch (e) {
-      console.error('Erro ao verificar autenticação:', e);
-    }
+  // Redirecionar /hospitais para /(app)/hospitais
+  if (request.nextUrl.pathname === '/hospitais') {
+    return NextResponse.rewrite(new URL('/(app)/hospitais', request.url));
+  }
+  
+  // Redirecionar /plantoes para /(app)/plantoes
+  if (request.nextUrl.pathname === '/plantoes') {
+    return NextResponse.rewrite(new URL('/(app)/plantoes', request.url));
+  }
+  
+  // Redirecionar /perfil para /(app)/perfil
+  if (request.nextUrl.pathname === '/perfil') {
+    return NextResponse.rewrite(new URL('/(app)/perfil', request.url));
+  }
+  
+  // Redirecionar /hospitais/novo para /(app)/hospitais/novo
+  if (request.nextUrl.pathname === '/hospitais/novo') {
+    return NextResponse.rewrite(new URL('/(app)/hospitais/novo', request.url));
+  }
+  
+  // Redirecionar /plantoes/novo para /(app)/plantoes/novo
+  if (request.nextUrl.pathname === '/plantoes/novo') {
+    return NextResponse.rewrite(new URL('/(app)/plantoes/novo', request.url));
   }
 
-  // Se o usuário não está autenticado e está tentando acessar uma rota protegida
-  // Excluir rotas públicas e recursos estáticos
-  const isPublicPath = 
-    request.nextUrl.pathname.startsWith('/auth') ||
-    request.nextUrl.pathname.startsWith('/_next') ||
-    request.nextUrl.pathname.startsWith('/api') ||
-    request.nextUrl.pathname === '/';
-
-  if (!session && !isPublicPath) {
-    return NextResponse.redirect(new URL('/auth/login', request.url));
-  }
-
-  // Se o usuário está autenticado e está tentando acessar páginas de autenticação
-  if (session && request.nextUrl.pathname.startsWith('/auth')) {
-    return NextResponse.redirect(new URL('/dashboard', request.url));
-  }
-
-  return res;
+  return NextResponse.next();
 }
 
-// Rotas que serão verificadas pelo middleware
+// Configurar quais rotas devem usar o middleware
 export const config = {
-  // Desativando temporariamente o middleware para simplificar o processo de autenticação
-  matcher: [],
-  // Para reativar, use:
-  // matcher: ['/((?!api|_next/static|_next/image|favicon.ico|auth/callback).*)'],
+  matcher: [
+    '/dashboard',
+    '/calendario',
+    '/historico',
+    '/hospitais',
+    '/hospitais/novo',
+    '/plantoes',
+    '/plantoes/novo',
+    '/perfil',
+  ],
 };
