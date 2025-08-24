@@ -219,15 +219,15 @@ export default function CalendarioPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-8 px-4">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-8">
       <div className="max-w-6xl mx-auto">
-        <div className="flex justify-between items-center mb-6">
-          <Link href="/dashboard" className="flex items-center text-emerald-600 hover:text-emerald-700">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+          <Link href="/dashboard" className="flex items-center text-emerald-600 hover:text-emerald-700 transition-colors">
             <ArrowLeft className="h-4 w-4 mr-2" />
             <span>Voltar para o Dashboard</span>
           </Link>
           <Link href="/plantoes/novo">
-            <Button className="bg-emerald-600 hover:bg-emerald-700">
+            <Button className="bg-emerald-600 hover:bg-emerald-700 transition-colors shadow-sm">
               Novo Plantão
             </Button>
           </Link>
@@ -242,62 +242,120 @@ export default function CalendarioPage() {
                 <CardDescription>Selecione uma data para ver os plantões</CardDescription>
               </CardHeader>
               <CardContent>
-                <Calendar
-                  mode="single"
-                  selected={selectedDate}
-                  onSelect={handleDateChange}
-                  locale={ptBR}
-                  className="rounded-md border"
-                  modifiers={{
-                    highlighted: (date) => temPlantao(date),
-                  }}
-                  modifiersStyles={{
-                    highlighted: { backgroundColor: '#dcfce7' },
-                  }}
-                />
+                <div className="p-2">
+                  <Calendar
+                    mode="single"
+                    selected={selectedDate}
+                    onSelect={handleDateChange}
+                    locale={ptBR}
+                    className="rounded-md border mx-auto"
+                    modifiers={{
+                      highlighted: (date) => temPlantao(date),
+                    }}
+                    modifiersStyles={{
+                      highlighted: { backgroundColor: '#dcfce7' },
+                    }}
+                    styles={{
+                      day_today: { 
+                        fontWeight: 'bold', 
+                        border: '2px solid #10b981',
+                        color: '#10b981'
+                      },
+                      day_selected: { 
+                        backgroundColor: '#10b981', 
+                        color: 'white',
+                        fontWeight: 'bold'
+                      },
+                      day: { 
+                        width: '40px', 
+                        height: '40px', 
+                        margin: '2px',
+                        borderRadius: '8px'
+                      },
+                      day_outside: { opacity: 0.5 },
+                      day_disabled: { color: '#ccc' },
+                      head_cell: { 
+                        color: '#10b981',
+                        fontWeight: 'bold',
+                        fontSize: '0.875rem',
+                        padding: '8px 0',
+                        textTransform: 'uppercase'
+                      },
+                      cell: { padding: '2px' },
+                      nav_button_previous: { 
+                        color: '#10b981',
+                        width: '32px',
+                        height: '32px'
+                      },
+                      nav_button_next: { 
+                        color: '#10b981',
+                        width: '32px',
+                        height: '32px'
+                      },
+                      caption: { 
+                        textTransform: 'capitalize',
+                        fontSize: '1.1rem',
+                        fontWeight: 'bold',
+                        padding: '8px 0'
+                      }
+                    }}
+                  />
+                </div>
               </CardContent>
             </Card>
           </div>
 
           {/* Detalhes do dia selecionado */}
           <div className="lg:col-span-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Plantões de {format(selectedDate, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}</CardTitle>
-                <CardDescription>
+            <Card className="h-full">
+              <CardHeader className="border-b bg-gradient-to-r from-emerald-50 to-teal-50">
+                <CardTitle className="text-xl text-emerald-700">
+                  Plantões de {format(selectedDate, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                </CardTitle>
+                <CardDescription className="text-emerald-600/70 font-medium">
                   {plantoesDodia.length > 0 
                     ? `${plantoesDodia.length} plantão(ões) neste dia` 
                     : 'Nenhum plantão registrado nesta data'}
                 </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-6">
                 {plantoesDodia.length > 0 ? (
                   <div className="space-y-4">
                     {plantoesDodia.map((plantao) => (
-                      <div key={plantao.id} className="bg-white rounded-lg border p-4">
-                        <div className="flex justify-between items-start">
+                      <div key={plantao.id} className="bg-white rounded-lg border border-gray-200 shadow-sm p-5 hover:shadow-md transition-shadow">
+                        <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
                           <div>
-                            <h3 className="font-medium">{getHospitalName(plantao.hospital_id)}</h3>
-                            <p className="text-sm text-gray-500">
-                              Horário: {plantao.hora_inicio} - {plantao.hora_fim}
-                            </p>
-                            {plantao.observacoes && (
-                              <p className="text-sm text-gray-500 mt-2">
-                                Obs: {plantao.observacoes}
+                            <h3 className="font-semibold text-gray-800 text-lg">{getHospitalName(plantao.hospital_id)}</h3>
+                            <div className="flex items-center mt-2 text-gray-600">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              <p className="text-sm">
+                                {plantao.hora_inicio} - {plantao.hora_fim}
                               </p>
+                            </div>
+                            {plantao.observacoes && (
+                              <div className="flex items-start mt-2 text-gray-600">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+                                </svg>
+                                <p className="text-sm">
+                                  {plantao.observacoes}
+                                </p>
+                              </div>
                             )}
                           </div>
                           <div className="text-right">
-                            <div className="font-bold text-emerald-600">{formatCurrency(plantao.valor)}</div>
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium mt-1 ${getStatusColor(plantao.status)}`}>
+                            <div className="font-bold text-emerald-600 text-xl">{formatCurrency(plantao.valor)}</div>
+                            <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium mt-2 ${getStatusColor(plantao.status)}`}>
                               {plantao.status.charAt(0).toUpperCase() + plantao.status.slice(1)}
                             </span>
                           </div>
                         </div>
-                        <div className="mt-4 flex justify-end">
+                        <div className="mt-4 pt-3 border-t flex justify-end">
                           <Link href={`/plantoes/${plantao.id}`}>
-                            <Button variant="outline" size="sm">
-                              Detalhes
+                            <Button variant="outline" size="sm" className="text-emerald-600 border-emerald-600 hover:bg-emerald-50">
+                              Ver Detalhes
                             </Button>
                           </Link>
                         </div>
@@ -305,10 +363,15 @@ export default function CalendarioPage() {
                     ))}
                   </div>
                 ) : (
-                  <div className="text-center py-12">
-                    <p className="text-gray-500 mb-4">Nenhum plantão registrado para esta data.</p>
+                  <div className="text-center py-16 flex flex-col items-center">
+                    <div className="bg-gray-50 rounded-full p-6 mb-4">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                    </div>
+                    <p className="text-gray-500 mb-6 text-lg">Nenhum plantão registrado para esta data.</p>
                     <Link href="/plantoes/novo">
-                      <Button className="bg-emerald-600 hover:bg-emerald-700">
+                      <Button className="bg-emerald-600 hover:bg-emerald-700 transition-colors shadow-sm">
                         Adicionar Plantão
                       </Button>
                     </Link>
