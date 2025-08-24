@@ -3,11 +3,9 @@ const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
   images: {
-    domains: ['eqbiczyksmfgskxqwskl.supabase.co'],
     unoptimized: true,
   },
   output: 'export',
-  distDir: '.next',
   // Desativar o ESLint durante a compilação para evitar problemas no Netlify
   eslint: {
     ignoreDuringBuilds: true,
@@ -18,7 +16,9 @@ const nextConfig = {
   },
   // Configuração específica para o Netlify
   trailingSlash: true,
-  // Configuração para rotas de API
+  // Desativar rotas de API em exportação estática
+  skipTrailingSlashRedirect: true,
+  // Ignorar erros de exportação estática
   experimental: {
     serverActions: false,
   },

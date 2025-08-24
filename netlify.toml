@@ -3,8 +3,8 @@
   publish = "out"
 
 [build.environment]
-  NODE_VERSION = "20.10.0"
-  NPM_VERSION = "10.2.3"
+  NODE_VERSION = "18.18.0"
+  NPM_VERSION = "9.8.0"
   NEXT_USE_NETLIFY_EDGE = "true"
 
 # Configuração para SPA (Single Page Application)
